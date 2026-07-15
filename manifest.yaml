@@ -1,0 +1,16 @@
+manifestVersion: 1
+name: "@kneel/plocate"
+version: "2026.07.15.1"
+description: "Wrap plocate to build, refresh, query, and expire a fast filesystem index — so extensions and agents can look up paths without walking directory trees."
+repository: "https://github.com/NeilHanlon/swamp-plocate"
+models:
+  - plocate.ts
+additionalFiles:
+  - README.md
+  - LICENSE.txt
+labels:
+  - plocate
+  - locate
+  - filesystem
+  - index
+  - search
