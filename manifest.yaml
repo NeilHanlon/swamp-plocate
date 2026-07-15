@@ -1,7 +1,80 @@
 manifestVersion: 1
 name: "@kneel/plocate"
-version: "2026.07.15.1"
-description: "Wrap plocate to build, refresh, query, and expire a fast filesystem index — so extensions and agents can look up paths without walking directory trees."
+version: "2026.07.15.2"
+description: |
+  Wrap [plocate](https://plocate.sesse.net/) to build, refresh, query, and
+  expire a fast filesystem index — so extensions and agents resolve paths
+  without walking directory trees. This model owns the index lifecycle and
+  cache-freshness policy: staleness is native swamp TTL (the `index` resource's
+  lifetime = `maxAge`), so an expired index simply stops resolving until
+  rebuilt. Transport defaults to `local`, with `toolbox`/`podman`/`commandPrefix`
+  escape hatches and an Ansible-style `become` to stack `sudo` for system builds.
+
+  ## Methods
+
+  - **build** / **refresh** — rebuild every root's DB in one execution; write the
+    aggregate `index` instance `main` (lifetime = `maxAge`).
+  - **refresh_all** — fan-out: rebuild every root in ONE execution / one lock;
+    write one `index` per root (slugged path name) plus aggregate `main`.
+  - **status** — stat DB mtimes host-side, compute `stale` vs `maxAge`; no rebuild.
+  - **clear** — delete the user DB(s) (verified inside `dbDir`) and mark the index
+    cleared. Never touches the system DB.
+  - **query** — match against the index and persist a CEL-referenceable `results`
+    instance (`q-<label>`). `refreshIfStale` self-heals a stale index first;
+    `scope: "system"` queries the read-only system DB.
+
+  ## Quickstart
+
+  ```bash
+  swamp model create @kneel/plocate rpm-index \
+    --global-arg roots='["/home/neil/dev/fedora/rpms/swamp"]'
+  swamp model method run rpm-index build
+  swamp model method run rpm-index query --arg pattern='.spec' --arg label=specs
+  ```
+
+  Consume the results with CEL (prefer `data.latest(...)`; its 2nd arg is the
+  **instance** name — `main` for the index, `q-<label>` for a query):
+
+  ```
+  data.latest("rpm-index", "q-specs").attributes.matches
+  ```
+
+  ## Selected examples
+
+  **Fan-out over matches** — index a corpus once, then let another model iterate
+  the matches instead of walking directories:
+
+  ```
+  # consuming model's forEach source:
+  data.latest("rpm-index", "q-specs").attributes.matches
+  ```
+
+  **Pre-flight existence gate** — a deploy `check` confirms a built asset exists
+  before acting, no filesystem crawl in the hot path:
+
+  ```bash
+  swamp model method run artifacts query \
+    --arg pattern='app-v2.3.1.tar.gz' --arg limit=1 \
+    --arg refreshIfStale=true --arg label=asset
+  ```
+  ```
+  # gate the deploy step on a nonzero match count:
+  data.latest("artifacts", "q-asset").attributes.count > 0
+  ```
+
+  **Agent "where is X"** — instant path resolution by name or regex, self-healing
+  if the index went stale:
+
+  ```bash
+  swamp model method run home-index query \
+    --arg pattern='plocate.*\.ts$' --arg regex=true \
+    --arg refreshIfStale=true --arg label=find-plocate
+  ```
+
+  Full docs — deployment requirements, transport + `become`, the global-argument
+  reference, and the complete 12-example catalog (nightly `refresh_all` cron,
+  multi-root queries, cross-model CEL wiring, backup verification):
+  https://github.com/NeilHanlon/swamp-plocate
 repository: "https://github.com/NeilHanlon/swamp-plocate"
 models:
   - plocate.ts

@@ -331,7 +331,7 @@ function stableHash(s) {
  */
 export const model = {
   type: "@kneel/plocate",
-  version: "2026.07.15.1",
+  version: "2026.07.15.2",
   globalArguments: GlobalArgsSchema,
 
   resources: {
